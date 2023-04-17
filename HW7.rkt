@@ -7,11 +7,11 @@ Mathyo Abou Asali - Razie Hyria |#
 (define-type Value
   (numV [n : Number])
   (boolV [b : Boolean])
+  (pairV [fst : Value] ; part 2
+         [snd : Value])
   (closV [arg : Symbol]
          [body : Exp]
-         [env : Env])
-  (pairV [fst : Value] ; part 2
-         [snd : Value]))
+         [env : Env]))
 
 (define-type Exp
   (numE [n : Number])
@@ -32,9 +32,10 @@ Mathyo Abou Asali - Razie Hyria |#
         [arg : Exp])
   (eqE [l : Exp] ; part 1
        [r : Exp])
-  (pairExp [fst : Exp] ; part 2, adding coverage for pair, first, and second
+  ; part 2, adding coverage for pair, first, and second
+  (pairE [fst : Exp] 
            [snd : Exp])
-  (fstE [pair : Exp])
+  (fstE [pair : Exp]) 
   (sndE [pair : Exp]))
 
 (define-type Type
@@ -43,8 +44,8 @@ Mathyo Abou Asali - Razie Hyria |#
   (arrowT [arg : Type]
           [result : Type])
   ; part 2, adding fst snd pair type coverage
-  (pairType [fst : Type]
-            [snd : Type]))
+  (crossT [fst : Type]
+          [snd : Type]))
 
 (define-type Binding
   (bind [name : Symbol]
@@ -65,8 +66,8 @@ Mathyo Abou Asali - Razie Hyria |#
 (define (parse [s : S-Exp]) : Exp
   (cond
     [(s-exp-match? `NUMBER s) (numE (s-exp->number s))]
-    [(s-exp-match? `true s) (trueE)]
-    [(s-exp-match? `false s) (falseE)]
+    [(s-exp-match? `true s) (trueE)]                  ;; part 1 added a case for trueE
+    [(s-exp-match? `false s) (falseE)]                ;; part 1 added a case for falseE
     [(s-exp-match? `SYMBOL s) (idE (s-exp->symbol s))]
     [(s-exp-match? `{+ ANY ANY} s)
      (plusE (parse (second (s-exp->list s)))
@@ -74,13 +75,20 @@ Mathyo Abou Asali - Razie Hyria |#
     [(s-exp-match? `{* ANY ANY} s)
      (multE (parse (second (s-exp->list s)))
             (parse (third (s-exp->list s))))]
-    [(s-exp-match? `{= ANY ANY} s)
-     (eqE (parse (second (s-exp->list s)))
-          (parse (third (s-exp->list s))))]
-    [(s-exp-match? `{if ANY ANY ANY} s)
+    [(s-exp-match? `{= ANY ANY} s)           ;; part 1 eqE check if the input matches the = operator
+     (eqE (parse (second (s-exp->list s)))   ;; parse the first operand
+          (parse (third (s-exp->list s))))]  ;; parse the second operand and create an equal expression
+    [(s-exp-match? `{if ANY ANY ANY} s)    ;; part 1 added a case for ifE
      (ifE (parse (second (s-exp->list s)))
             (parse (third (s-exp->list s)))
             (parse (fourth (s-exp->list s))))]
+    [(s-exp-match? `{pair ANY ANY} s)          ;; part 2 added a case for pairE
+     (pairE (parse (second (s-exp->list s)))
+            (parse (third (s-exp->list s))))]
+    [(s-exp-match? `{fst ANY} s)                ;; part 2 added a case for fstE
+     (fstE (parse (second (s-exp->list s))))]
+    [(s-exp-match? `{snd ANY} s)                 ;; part 2 added a case for sndE
+     (sndE (parse (second (s-exp->list s))))]   
     [(s-exp-match? `{let {[SYMBOL : ANY ANY]} ANY} s)
      (let ([bs (s-exp->list (first
                              (s-exp->list (second
@@ -110,6 +118,9 @@ Mathyo Abou Asali - Razie Hyria |#
    [(s-exp-match? `(ANY -> ANY) s)
     (arrowT (parse-type (first (s-exp->list s)))
             (parse-type (third (s-exp->list s))))]
+   [(s-exp-match? `(ANY * ANY) s)                 ;; added a type case for crossT
+    (crossT (parse-type (first (s-exp->list s)))
+            (parse-type (third (s-exp->list s))))]
    [else (error 'parse-type "invalid input")]))
 
 ;; interp ----------------------------------------
@@ -121,8 +132,10 @@ Mathyo Abou Asali - Razie Hyria |#
     [(falseE) (boolV #f)]; part 1
     [(plusE l r) (num+ (interp l env) (interp r env))]
     [(multE l r) (num* (interp l env) (interp r env))]
-    [(eqE l r) (boolV (equal? (interp l env) (interp r env)))]
-    [(ifE tst thn els)
+     ;; part 1 eqE evaluate the left side and right-hand side expressions recursively
+    ;; then checks whether the two resulting values are equal usingequal? function and returns a boolean value accordingly.
+    [(eqE l r) (boolV (equal? (interp l env) (interp r env)))]      
+    [(ifE tst thn els)            ;; part 1 added a case for ifE
      (type-case Value (interp tst env)
        [(boolV b) (interp (if b thn els) env)]
        [else (error 'interp "not a boolean")])]
@@ -136,17 +149,15 @@ Mathyo Abou Asali - Razie Hyria |#
                                       (interp arg env))
                                 c-env))]
                       [else (error 'interp "not a function")])]
-    ;; PART 2 - Coverage---------------
-    [(pairExp fst snd)
-     (pairV (interp fst env) (interp snd env))]
-    [(fstE p)
-     (type-case Value (interp p env)
-       [(pairV fst _) fst]
-       [else (error 'interp "not a pair")])]
-    [(sndE p)
-     (type-case Value (interp p env)
-       [(pairV _ snd) snd]
-       [else (error 'interp "not a pair")])]))
+    [(pairE fst snd) (pairV (interp fst env) (interp snd env))]    ;; part 2 added a case for pairE
+    [(fstE pair)         ;; part 2 added a case for fstE                                       
+     (type-case Value (interp pair env)
+       [(pairV f s) f]
+       [else (error 'interp "not fruit based humor")])]
+    [(sndE pair)    ;; part 2 added a case for sndE                               
+     (type-case Value (interp pair env)
+       [(pairV f s) s]
+       [else (error 'interp "not fruit based humor")])]))
 
 ;; num+ and num* ----------------------------------------
 (define (num-op [op : (Number Number -> Number)] [l : Value] [r : Value]) : Value
@@ -175,16 +186,26 @@ Mathyo Abou Asali - Razie Hyria |#
 (define (typecheck [a : Exp] [tenv : Type-Env])
   (type-case Exp a
     [(numE n) (numT)]
-    [(trueE) (boolT)]
-    [(falseE) (boolT)]
-    [(plusE l r) 
+    [(trueE) (boolT)] ;; part 1
+    [(falseE) (boolT)] ;; part 1
+    [(pairE f s) ;; part 2
+     (crossT (typecheck f tenv) (typecheck s tenv))]
+    [(fstE pair) ;; part 2
+     (type-case Type (typecheck pair tenv)
+       [(crossT f s) f]
+       [else (type-error pair "pair")])]
+    [(sndE pair) ;; part 2
+     (type-case Type (typecheck pair tenv)
+       [(crossT f s) s]
+       [else (type-error pair "pair")])]
+    [(plusE l r) ;; part 1 changed plusE because changes has been made to the typecheck-nums the plus expression has type numT if both operands have type numT
      (type-case Type (typecheck l tenv)
        [(numT) 
         (type-case Type (typecheck r tenv)
           [(numT) (numT)]
           [else (type-error r "num")])]
        [else (type-error l "num")])]
-    [(multE l r) 
+    [(multE l r)  ;; the multiplication expression has type numT if both operands have type numT
      (type-case Type (typecheck l tenv)
        [(numT) 
         (type-case Type (typecheck r tenv)
@@ -200,7 +221,7 @@ Mathyo Abou Asali - Razie Hyria |#
               thnt
               (type-error thnt (to-string elst))))]
        [else (type-error tst "boolean")])]
-    [(eqE l r) (typecheck-nums l r tenv)] 
+    [(eqE l r) (typecheck-nums l r tenv)]   ; typecheck the operands as numbers and return a boolean type
     [(idE n) (type-lookup n tenv)]
     [(lamE n arg-type body)
      (arrowT arg-type
@@ -217,13 +238,18 @@ Mathyo Abou Asali - Razie Hyria |#
                         (to-string arg-type)))]
        [else (type-error fun "function")])]))
 
-(define (typecheck-nums l r tenv)
+(define (typecheck-nums l r tenv)   ;; changed this function for part 2 to produce a boolean if it gives two numbers
   (type-case Type (typecheck l tenv)
+    ; If the left operand is of type `numT`, then type check the right operand `r`
     [(numT)
      (type-case Type (typecheck r tenv)
+       ; If the right operand is also of type `numT`, then the expression is of type `boolT`
        [(numT) (boolT)]
+       ; Otherwise, throw a type error indicating that the right operand should be of type `num`
        [else (type-error r "num")])]
-    [else (type-error l "num or bool")]))
+    ; If the left operand is not of type `numT`, then throw a type error indicating that the left operand should be of type `num`
+    [else (type-error l "num")]))
+
 
 (define (type-error a msg)
   (error 'typecheck (string-append
@@ -236,34 +262,7 @@ Mathyo Abou Asali - Razie Hyria |#
 (define type-lookup
   (make-lookup tbind-name tbind-type))
 
-(test (interp (parse `{if true 4 5})
-              mt-env)
-      (numV 4))
-(test (interp (parse `{if false 4 5})
-              mt-env)
-      (numV 5))
-(test (interp (parse `{if {= 13 {if {= 1 {+ -1 2}}
-                                    12
-                                    13}}
-                          4
-                          5})
-              mt-env)
-      (numV 5))
-(test (typecheck (parse `{= 13 {if {= 1 {+ -1 2}}
-                                   12
-                                   13}})
-                 mt-env)
-      (boolT))
-(test (typecheck (parse `{if {= 1 {+ -1 2}}
-                             {lambda {[x : num]} {+ x 1}}
-                             {lambda {[y : num]} y}})
-                 mt-env)
-
-      (arrowT (numT) (numT)))
-(test/exn (typecheck (parse `{+ 1 {if true true false}})
-                     mt-env)
-          "no type")
-
+;; module test-----------------------------------------
 (module+ test
   (test (typecheck (parse `10) mt-env)
         (numT))
@@ -396,3 +395,85 @@ Mathyo Abou Asali - Razie Hyria |#
             "invalid input"))
 (module+ test
   (print-only-errors #t))
+
+;; part 1 test cases----------------------------------------
+(test (interp (parse `{if true 4 5})
+              mt-env)
+      (numV 4))
+(test (interp (parse `{if false 4 5})
+              mt-env)
+      (numV 5))
+(test (interp (parse `{if {= 13 {if {= 1 {+ -1 2}}
+                                    12
+                                    13}}
+                          4
+                          5})
+              mt-env)
+      (numV 5))
+(test (typecheck (parse `{= 13 {if {= 1 {+ -1 2}}
+                                   12
+                                   13}})
+                 mt-env)
+      (boolT))
+(test (typecheck (parse `{if {= 1 {+ -1 2}}
+                             {lambda {[x : num]} {+ x 1}}
+                             {lambda {[y : num]} y}})
+                 mt-env)
+
+      (arrowT (numT) (numT)))
+(test/exn (typecheck (parse `{+ 1 {if true true false}})
+                     mt-env)
+          "no type")
+
+;; part 2 test cases----------------------------------------
+(test (interp (parse `{pair 10 8})
+              mt-env)
+;; Your constructor might be different than pairV:
+      (pairV (numV 10) (numV 8)))
+(test (interp (parse `{fst {pair 10 8}})
+              mt-env)
+      (numV 10))
+(test (interp (parse `{snd {pair 10 8}})
+              mt-env)
+      (numV 8))
+(test (interp (parse `{let {[p : (num * num) {pair 10 8}]}
+                        {fst p}})
+              mt-env)
+      (numV 10))
+(test (typecheck (parse `{pair 10 8})
+                 mt-env)
+;; Your constructor might be different than crossT:
+      (crossT (numT) (numT)))
+(test (typecheck (parse `{fst {pair 10 8}})
+                 mt-env)
+      (numT))
+(test (typecheck (parse `{+ 1 {snd {pair 10 8}}})
+                 mt-env)
+      (numT))
+(test (typecheck (parse `{lambda {[x : (num * bool)]}
+                           {fst x}})
+                 mt-env)
+;; Your constructor might be different than crossT:
+      (arrowT (crossT (numT) (boolT)) (numT)))
+(test (typecheck (parse `{{lambda {[x : (num * bool)]}
+                            {fst x}}
+                          {pair 1 false}})
+                 mt-env)
+      (numT))
+(test (typecheck (parse `{{lambda {[x : (num * bool)]}
+                            {snd x}}
+                          {pair 1 false}})
+                 mt-env)
+      (boolT))
+(test/exn (typecheck (parse `{fst 10})
+                     mt-env)
+          "no type")
+(test/exn (typecheck (parse `{+ 1 {fst {pair false 8}}})
+                     mt-env)
+          "no type")
+(test/exn (typecheck (parse `{lambda {[x : (num * bool)]}
+                               {if {fst x}
+                                   1
+                                   2}})
+                     mt-env)
+          "no type")
