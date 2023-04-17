@@ -1,17 +1,23 @@
 #lang plait
-
+#|4/17/23
+Homework #7 - Group Project
+Mathyo Abou Asali - Razie Hyria |#
+;; ============================================================
+ 
 (define-type Value
   (numV [n : Number])
   (boolV [b : Boolean])
   (closV [arg : Symbol]
          [body : Exp]
-         [env : Env]))
+         [env : Env])
+  (pairV [fst : Value] ; part 2
+         [snd : Value]))
 
 (define-type Exp
   (numE [n : Number])
-  (trueE)
-  (falseE)
-  (ifE [tst : Exp]
+  (trueE) ; part 1
+  (falseE) ; part 1
+  (ifE [tst : Exp]; part 1
        [thn : Exp]
        [els : Exp])
   (idE [s : Symbol])
@@ -24,14 +30,21 @@
         [body : Exp])
   (appE [fun : Exp]
         [arg : Exp])
-  (eqE [l : Exp]
-       [r : Exp]))
+  (eqE [l : Exp] ; part 1
+       [r : Exp])
+  (pairExp [fst : Exp] ; part 2, adding coverage for pair, first, and second
+           [snd : Exp])
+  (fstE [pair : Exp])
+  (sndE [pair : Exp]))
 
 (define-type Type
   (numT)
   (boolT)
   (arrowT [arg : Type]
-          [result : Type]))
+          [result : Type])
+  ; part 2, adding fst snd pair type coverage
+  (pairType [fst : Type]
+            [snd : Type]))
 
 (define-type Binding
   (bind [name : Symbol]
@@ -104,8 +117,8 @@
   (type-case Exp a
     [(numE n) (numV n)]
     [(idE s) (lookup s env)]
-    [(trueE) (boolV #t)]
-    [(falseE) (boolV #f)]
+    [(trueE) (boolV #t)]; part 1
+    [(falseE) (boolV #f)]; part 1
     [(plusE l r) (num+ (interp l env) (interp r env))]
     [(multE l r) (num* (interp l env) (interp r env))]
     [(eqE l r) (boolV (equal? (interp l env) (interp r env)))]
@@ -122,7 +135,18 @@
                                 (bind n
                                       (interp arg env))
                                 c-env))]
-                      [else (error 'interp "not a function")])]))
+                      [else (error 'interp "not a function")])]
+    ;; PART 2 - Coverage---------------
+    [(pairExp fst snd)
+     (pairV (interp fst env) (interp snd env))]
+    [(fstE p)
+     (type-case Value (interp p env)
+       [(pairV fst _) fst]
+       [else (error 'interp "not a pair")])]
+    [(sndE p)
+     (type-case Value (interp p env)
+       [(pairV _ snd) snd]
+       [else (error 'interp "not a pair")])]))
 
 ;; num+ and num* ----------------------------------------
 (define (num-op [op : (Number Number -> Number)] [l : Value] [r : Value]) : Value
