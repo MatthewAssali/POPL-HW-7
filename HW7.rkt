@@ -132,8 +132,8 @@ Mathyo Abou Asali - Razie Hyria |#
     [(falseE) (boolV #f)]; part 1
     [(plusE l r) (num+ (interp l env) (interp r env))]
     [(multE l r) (num* (interp l env) (interp r env))]
-     ;; part 1 eqE evaluate the left side and right-hand side expressions recursively
-    ;; then checks whether the two resulting values are equal usingequal? function and returns a boolean value accordingly.
+     ;; part 1 eqE evaluate the left side and right side expressions recursively
+    ;; then checks whether the two resulting values are equal using equal? and returns a boolean value
     [(eqE l r) (boolV (equal? (interp l env) (interp r env)))]      
     [(ifE tst thn els)            ;; part 1 added a case for ifE
      (type-case Value (interp tst env)
