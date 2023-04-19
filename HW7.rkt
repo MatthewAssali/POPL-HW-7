@@ -401,9 +401,6 @@ Mathyo Abou Asali - Razie Hyria |#
   (print-only-errors #t))
 
 ;; part 1 test cases----------------------------------------
-(test/exn (typecheck (parse `(= false 10)) mt-env) "num")
-(test/exn (typecheck (parse `(= 10 false)) mt-env) "num")
-
 (test (interp (parse `{if true 4 5})
               mt-env)
       (numV 4))
@@ -520,5 +517,13 @@ Mathyo Abou Asali - Razie Hyria |#
           "no type")
 
 (test/exn (typecheck (parse `{+ {lambda {[x : bool]} x} 2})
+                     mt-env)
+          "no type")
+
+(test/exn (typecheck-nums (parse `(+ 1 true)) (parse `(+ 1 2)) mt-env)
+          "no type")
+(test/exn (typecheck (parse `(= false 10)) mt-env) "num")
+(test/exn (typecheck (parse `(= 10 false)) mt-env) "num")
+(test/exn (typecheck (parse `{+ 1 {if true false 2}})
                      mt-env)
           "no type")
