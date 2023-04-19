@@ -9,7 +9,7 @@ Mathyo Abou Asali - Razie Hyria |#
   (boolV [b : Boolean])
   (pairV [fst : Value] ; part 2
          [snd : Value])
-  (closV [arg : Symbol]
+  (closV [args : (Listof Symbol)]
          [body : Exp]
          [env : Env]))
 
@@ -25,11 +25,11 @@ Mathyo Abou Asali - Razie Hyria |#
          [r : Exp])
   (multE [l : Exp]
          [r : Exp])
-  (lamE [n : Symbol]
-        [arg-type : Type]
+  (lamE [ns : (Listof Symbol)]
+        [arg-types : (Listof Type)]
         [body : Exp])
   (appE [fun : Exp]
-        [arg : Exp])
+        [args : (Listof Exp)])
   (eqE [l : Exp] ; part 1
        [r : Exp])
   ; part 2, adding coverage for pair, first, and second
@@ -41,7 +41,7 @@ Mathyo Abou Asali - Razie Hyria |#
 (define-type Type
   (numT)
   (boolT)
-  (arrowT [arg : Type]
+  (arrowT [args : (Listof Type)]
           [result : Type])
   ; part 2, adding fst snd pair type coverage
   (crossT [fst : Type]
@@ -58,6 +58,7 @@ Mathyo Abou Asali - Razie Hyria |#
          [type : Type]))
 
 (define-type-alias Type-Env (Listof Type-Binding))
+
 
 (define mt-env empty)
 (define extend-env cons)
@@ -93,20 +94,20 @@ Mathyo Abou Asali - Razie Hyria |#
      (let ([bs (s-exp->list (first
                              (s-exp->list (second
                                            (s-exp->list s)))))])
-       (appE (lamE (s-exp->symbol (first bs))
-                   (parse-type (third bs))
+       (appE (lamE (list (s-exp->symbol (first bs)))
+                   (list (parse-type (third bs)))
                    (parse (third (s-exp->list s))))
-             (parse (fourth bs))))]
-    [(s-exp-match? `{lambda {[SYMBOL : ANY]} ANY} s)
-     (let ([arg (s-exp->list
-                 (first (s-exp->list 
-                         (second (s-exp->list s)))))])
-       (lamE (s-exp->symbol (first arg))
-             (parse-type (third arg))
+             (list (parse (fourth bs)))))]
+    [(s-exp-match? `{lambda {[SYMBOL : ANY] ...} ANY} s)
+     (let ([args (map s-exp->list
+                 (s-exp->list 
+                         (second (s-exp->list s))))])
+       (lamE (map s-exp->symbol (map first args))
+             (map parse-type (map third args))
              (parse (third (s-exp->list s)))))]
-    [(s-exp-match? `{ANY ANY} s)
+    [(s-exp-match? `{ANY ANY ...} s)
      (appE (parse (first (s-exp->list s)))
-           (parse (second (s-exp->list s))))]
+           (map parse (rest (s-exp->list s))))]
     [else (error 'parse "invalid input")]))
 
 (define (parse-type [s : S-Exp]) : Type
@@ -115,9 +116,10 @@ Mathyo Abou Asali - Razie Hyria |#
     (numT)]
    [(s-exp-match? `bool s)
     (boolT)]
-   [(s-exp-match? `(ANY -> ANY) s)
-    (arrowT (parse-type (first (s-exp->list s)))
-            (parse-type (third (s-exp->list s))))]
+   [(s-exp-match? `(ANY ... -> ANY) s)
+    (arrowT (map parse-type (reverse
+                             (rest (rest (reverse (s-exp->list s))))))
+            (parse-type (first (reverse (s-exp->list s)))))]
    [(s-exp-match? `(ANY * ANY) s)                 ;; added a type case for crossT
     (crossT (parse-type (first (s-exp->list s)))
             (parse-type (third (s-exp->list s))))]
@@ -132,23 +134,24 @@ Mathyo Abou Asali - Razie Hyria |#
     [(falseE) (boolV #f)]; part 1
     [(plusE l r) (num+ (interp l env) (interp r env))]
     [(multE l r) (num* (interp l env) (interp r env))]
-     ;; part 1 eqE evaluate the left side and right side expressions recursively
-    ;; then checks whether the two resulting values are equal using equal? and returns a boolean value
+     ;; part 1 eqE evaluate the left side and right-hand side expressions recursively
+    ;; then checks whether the two resulting values are equal usingequal? function and returns a boolean value accordingly.
     [(eqE l r) (boolV (equal? (interp l env) (interp r env)))]      
     [(ifE tst thn els)            ;; part 1 added a case for ifE
      (type-case Value (interp tst env)
        [(boolV b) (interp (if b thn els) env)]
        [else (error 'interp "not a boolean")])]
-    [(lamE n t body)
-     (closV n body env)]
-    [(appE fun arg) (type-case Value (interp fun env)
-                      [(closV n body c-env)
-                       (interp body
-                               (extend-env
-                                (bind n
-                                      (interp arg env))
-                                c-env))]
-                      [else (error 'interp "not a function")])]
+    [(lamE ns arg-types body)
+     (closV ns body env)]
+   [(appE fun args) (type-case Value (interp fun env)
+                       [(closV ns body c-env)
+                        (interp body
+                                (append
+                                 (map2 bind
+                                       ns
+                                       (map (lambda(arg) (interp arg env)) args))
+                                 c-env))]
+                       [else (error 'interp "not a function")])]
     [(pairE fst snd) (pairV (interp fst env) (interp snd env))]    ;; part 2 added a case for pairE
     [(fstE pair)         ;; part 2 added a case for fstE                                       
      (type-case Value (interp pair env)
@@ -185,6 +188,20 @@ Mathyo Abou Asali - Razie Hyria |#
 ;; typecheck -------------------------------------
 (define (typecheck [a : Exp] [tenv : Type-Env])
   (type-case Exp a
+    [(lamE ns arg-types body)
+     (arrowT arg-types
+             (typecheck body 
+                        (append (map2 tbind ns arg-types)
+                                    tenv)))]
+    [(appE fun args)
+     (type-case Type (typecheck fun tenv)
+       [(arrowT arg-types result-type)
+        (if (equal? arg-types
+                    (map (lambda (arg) (typecheck arg tenv)) args))
+            result-type
+            (type-error args
+                        (to-string arg-types)))]
+       [else (type-error fun "function")])]
     [(numE n) (numT)]
     [(trueE) (boolT)] ;; part 1
     [(falseE) (boolT)] ;; part 1
@@ -222,21 +239,8 @@ Mathyo Abou Asali - Razie Hyria |#
               (type-error thnt (to-string elst))))]
        [else (type-error tst "boolean")])]
     [(eqE l r) (typecheck-nums l r tenv)]   ; typecheck the operands as numbers and return a boolean type
-    [(idE n) (type-lookup n tenv)]
-    [(lamE n arg-type body)
-     (arrowT arg-type
-             (typecheck body 
-                        (extend-env (tbind n arg-type)
-                                    tenv)))]
-    [(appE fun arg)
-     (type-case Type (typecheck fun tenv)
-       [(arrowT arg-type result-type)
-        (if (equal? arg-type
-                    (typecheck arg tenv))
-            result-type
-            (type-error arg
-                        (to-string arg-type)))]
-       [else (type-error fun "function")])]))
+    [(idE n) (type-lookup n tenv)]))
+
 
 (define (typecheck-nums l r tenv)   ;; changed this function for part 2 to produce a boolean if it gives two numbers
   (type-case Type (typecheck l tenv)
@@ -271,9 +275,9 @@ Mathyo Abou Asali - Razie Hyria |#
   (test (typecheck (parse `{* 10 17}) mt-env)
         (numT))
   (test (typecheck (parse `{lambda {[x : num]} 12}) mt-env)
-        (arrowT (numT) (numT)))
+        (arrowT (list (numT)) (numT)))
   (test (typecheck (parse `{lambda {[x : num]} {lambda {[y : bool]} x}}) mt-env)
-        (arrowT (numT) (arrowT (boolT)  (numT))))
+        (arrowT (list (numT)) (arrowT (list (boolT))  (numT))))
 
   (test (typecheck (parse `{{lambda {[x : num]} 12}
                             {+ 1 17}})
@@ -334,7 +338,7 @@ Mathyo Abou Asali - Razie Hyria |#
         (numV 19))
   (test (interp (parse `{lambda {[x : num]} {+ x x}})
                 mt-env)
-        (closV 'x (plusE (idE 'x) (idE 'x)) mt-env))
+        (closV (list 'x) (plusE (idE 'x) (idE 'x)) mt-env))
   (test (interp (parse `{let {[x : num 5]}
                           {+ x x}})
                 mt-env)
@@ -376,12 +380,12 @@ Mathyo Abou Asali - Razie Hyria |#
                (numE 8)))
   (test (parse `{let {[x : num {+ 1 2}]}
                   y})
-        (appE (lamE 'x (numT) (idE 'y))
-              (plusE (numE 1) (numE 2))))
+        (appE (lamE (list 'x) (list (numT)) (idE 'y))
+              (list (plusE (numE 1) (numE 2)))))
   (test (parse `{lambda {[x : num]} 9})
-        (lamE 'x (numT) (numE 9)))
+        (lamE (list'x) (list (numT)) (numE 9)))
   (test (parse `{double 9})
-        (appE (idE 'double) (numE 9)))
+        (appE (idE 'double) (list(numE 9))))
   (test/exn (parse `{{+ 1 2}})
             "invalid input")
 
@@ -390,7 +394,7 @@ Mathyo Abou Asali - Razie Hyria |#
   (test (parse-type `bool)
         (boolT))
   (test (parse-type `(num -> bool))
-        (arrowT (numT) (boolT)))
+        (arrowT (list (numT)) (boolT)))
   (test/exn (parse-type `1)
             "invalid input"))
 (module+ test
@@ -420,7 +424,7 @@ Mathyo Abou Asali - Razie Hyria |#
                              {lambda {[y : num]} y}})
                  mt-env)
 
-      (arrowT (numT) (numT)))
+      (arrowT (list (numT)) (numT)))
 (test/exn (typecheck (parse `{+ 1 {if true true false}})
                      mt-env)
           "no type")
