@@ -402,6 +402,7 @@ Mathyo Abou Asali - Razie Hyria |#
 
 ;; part 1 test cases----------------------------------------
 (test/exn (typecheck (parse `(= false 10)) mt-env) "num")
+(test/exn (typecheck (parse `(= 10 false)) mt-env) "num")
 
 (test (interp (parse `{if true 4 5})
               mt-env)
