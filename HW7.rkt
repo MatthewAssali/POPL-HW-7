@@ -458,7 +458,7 @@ Mathyo Abou Asali - Razie Hyria |#
                            {fst x}})
                  mt-env)
 ;; Your constructor might be different than crossT:
-      (arrowT (crossT (numT) (boolT)) (numT)))
+      (arrowT (list (crossT (numT) (boolT))) (numT)))
 (test (typecheck (parse `{{lambda {[x : (num * bool)]}
                             {fst x}}
                           {pair 1 false}})
@@ -479,5 +479,25 @@ Mathyo Abou Asali - Razie Hyria |#
                                {if {fst x}
                                    1
                                    2}})
+                     mt-env)
+          "no type")
+;; part 3 test cases----------------------------------------
+(test (interp (parse `{{lambda {}
+                         10}})
+              mt-env)
+      (numV 10))
+(test (interp (parse `{{lambda {[x : num] [y : num]} {+ x y}}
+                       10
+                       20})
+              mt-env)
+      (numV 30))
+(test (typecheck (parse `{{lambda {[x : num] [y : bool]} y}
+                          10
+                          false})
+                 mt-env)
+      (boolT))
+(test/exn (typecheck (parse `{{lambda {[x : num] [y : bool]} y}
+                              false
+                              10})
                      mt-env)
           "no type")
