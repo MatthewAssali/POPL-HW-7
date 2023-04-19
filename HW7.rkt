@@ -156,11 +156,11 @@ Mathyo Abou Asali - Razie Hyria |#
     [(fstE pair)         ;; part 2 added a case for fstE                                       
      (type-case Value (interp pair env)
        [(pairV f s) f]
-       [else (error 'interp "not fruit based humor")])]
+       [else (error 'interp "not a pair")])]
     [(sndE pair)    ;; part 2 added a case for sndE                               
      (type-case Value (interp pair env)
        [(pairV f s) s]
-       [else (error 'interp "not fruit based humor")])]))
+       [else (error 'interp "not a pair")])]))
 
 ;; num+ and num* ----------------------------------------
 (define (num-op [op : (Number Number -> Number)] [l : Value] [r : Value]) : Value
@@ -386,7 +386,7 @@ Mathyo Abou Asali - Razie Hyria |#
         (lamE (list'x) (list (numT)) (numE 9)))
   (test (parse `{double 9})
         (appE (idE 'double) (list(numE 9))))
-  (test/exn (parse `{{+ 1 2}})
+  (test/exn (parse `{{'()}})
             "invalid input")
 
   (test (parse-type `num)
@@ -428,7 +428,8 @@ Mathyo Abou Asali - Razie Hyria |#
 (test/exn (typecheck (parse `{+ 1 {if true true false}})
                      mt-env)
           "no type")
-
+(test/exn (interp (parse `{if 1 2 3}) mt-env)
+          "not a boolean")
 ;; part 2 test cases----------------------------------------
 (test (interp (parse `{pair 10 8})
               mt-env)
@@ -472,6 +473,10 @@ Mathyo Abou Asali - Razie Hyria |#
 (test/exn (typecheck (parse `{fst 10})
                      mt-env)
           "no type")
+(test/exn (typecheck (parse `{snd 10})
+                     mt-env)
+          "no type")
+
 (test/exn (typecheck (parse `{+ 1 {fst {pair false 8}}})
                      mt-env)
           "no type")
@@ -481,6 +486,12 @@ Mathyo Abou Asali - Razie Hyria |#
                                    2}})
                      mt-env)
           "no type")
+(test/exn (interp (parse `{fst {fst 1}})
+              mt-env)
+      "not a pair")
+(test/exn (interp (parse `{snd {snd 1}})
+              mt-env)
+      "not a pair")
 ;; part 3 test cases----------------------------------------
 (test (interp (parse `{{lambda {}
                          10}})
@@ -499,5 +510,12 @@ Mathyo Abou Asali - Razie Hyria |#
 (test/exn (typecheck (parse `{{lambda {[x : num] [y : bool]} y}
                               false
                               10})
+                     mt-env)
+          "no type")
+(test/exn (typecheck (parse `(* 2 true))
+                     mt-env)
+          "no type")
+
+(test/exn (typecheck (parse `{+ {lambda {[x : bool]} x} 2})
                      mt-env)
           "no type")
